@@ -1,0 +1,205 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<link rel="import" href="../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../bower_components/iron-icons/iron-icons.html">
+<link rel="import" href="../bower_components/iron-icon/iron-icon.html">
+<link rel="import" href="../bower_components/iron-form/iron-form.html">
+<link rel="import" href="../bower_components/iron-ajax/iron-ajax.html">
+<link rel="import" href="../bower_components/paper-input/paper-input.html">
+<link rel="import" href="../bower_components/paper-dropdown-menu/paper-dropdown-menu.html">
+<link rel="import" href="../bower_components/paper-listbox/paper-listbox.html">
+<link rel="import" href="../bower_components/paper-item/paper-item.html">
+<link rel="import" href="../bower_components/paper-checkbox/paper-checkbox.html">
+<link rel="import" href="../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../bower_components/paper-toast/paper-toast.html">
+<link rel="import" href="../bower_components/neon-animation/web-animations.html">
+<link rel="import" href="shared-styles.html">
+
+<dom-module id="forex-convert">
+  <template>
+    <style include="shared-styles">
+      :host {
+        display: block;
+
+        padding: 10px;
+      }
+      .card{
+        max-width:600px;
+        margin: 10px auto;
+      }
+      .inputblock{
+        padding:10px 0;
+      }
+      .hide{
+        display: none;
+      }
+    </style>
+
+    <div class="card">
+      <div class="circle">
+        <iron-icon icon="compare-arrows"></iron-icon>
+      </div>
+      <h1>Currency Converter</h1>
+      <iron-form is="iron-form" id="forexConvert">
+        <form>
+          <fieldset>
+              <legend>Convert:</legend>
+              <div class="inputblock">
+                <paper-input name="Amount" always-float-label label="Enter Amount" required error-message="Numeric Value Above 0 Required" value="{{convertValue.amount}}" min="1" type="number" allowed-pattern="[0-9]"></paper-input>
+              </div>
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="50%">
+                    <div class="inputblock">
+                      <paper-dropdown-menu label="From" on-iron-select="_currFromSelected" value="{{convertValue.fromType}}">
+                          <paper-listbox slot="dropdown-content" name="From" selected="0">
+                            <template is="dom-repeat" items="{{currency}}">
+                              <paper-item>{{item}}</paper-item>
+                            </template>
+                          </paper-listbox>
+                      </paper-dropdown-menu>
+                    </div>
+                  </td>
+                  <td width="50%">
+                    <div class="inputblock">
+                      <paper-dropdown-menu label="To" on-iron-select="_currToSelected" value="{{convertValue.toType}}">
+                          <paper-listbox slot="dropdown-content" name="To" selected="0">
+                            <template is="dom-repeat" items="{{currency}}">
+                              <paper-item>{{item}}</paper-item>
+                            </template>
+                          </paper-listbox>
+                      </paper-dropdown-menu>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+              <iron-ajax id="conversionRate" auto url="https://api.fixer.io/latest" handle-as="json" on-response="handleResponse" debounce-duration="300"></iron-ajax>
+              <iron-ajax id="convertNow" url="https://api.fixer.io/latest" handle-as="json" on-response="showConversion" debounce-duration="300"></iron-ajax>
+              <iron-ajax id="saveTransaction" url="http://127.0.0.1:8080/addTransaction" method="post" body='{{convertValue}}' handle-as="json" content-type="application/json" on-response="saveStatus" debounce-duration="300"></iron-ajax>
+              <div class="inputblock">
+                <paper-button on-click="submitForm" raised><iron-icon icon="autorenew"></iron-icon>
+                  Convert
+                </paper-button>
+                <paper-button on-click="saveData" raised><iron-icon icon="arrow-forward"></iron-icon>
+                  Save Transaction
+                </paper-button>
+              </div>
+              <paper-toast id="toast" class="fit-bottom"></paper-toast>
+          </fieldset>
+        </form>
+      </iron-form>
+      <div class="clear">&nbsp;</div>
+      <template is="dom-if" if="{{convertValue.status}}">
+        <fieldset>
+          <legend>Converted Values:</legend>
+          <div>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <thead>
+                <tr>
+                  <th align="left">From</th>
+                  <th align="left">To</th>
+                  <th align="left">Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>{{convertValue.fromType}}</td>
+                  <td>{{convertValue.toType}}</td>
+                  <td>{{convertValue.rate}}</td>
+                </tr>
+                <tr>
+                  <td>{{convertValue.amount}}</td>
+                  <td>{{convertValue.converted}}</td>
+                  <td>{{convertValue.date}}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </fieldset>
+      </template>
+    </div>
+  </template>
+
+  <script>
+    class ForexConvert extends Polymer.Element {
+      static get is() { return 'forex-convert'; }
+      static get properties(){
+        return{
+          currency:{
+            type:Array,
+            value:[]
+          },
+          convertValue:{
+            type:Object,
+            value:{
+              amount:"50000",
+              converted:"INR 2558460.83",
+              date:"2018-01-22",
+              fromType:"AUD",
+              rate:0.019543,
+              status:false,
+              toType:"INR"
+            }
+          }
+        }
+      }
+      _currToSelected(e){
+        if(e.target.selectedItem){
+          this.convertValue.toType = e.target.selectedItem.innerText;
+        }
+      }
+      _currFromSelected(e){
+        if(e.target.selectedItem){
+          this.convertValue.fromType = e.target.selectedItem.innerText;
+        }
+      }
+      handleResponse(e){
+        var rates_list = e.detail.__data.response.rates;
+        for(var rate in rates_list){
+          this.push('currency',rate);
+        }
+      }
+      showConversion(e){
+        var data = e.detail.__data.response;
+        this.convertValue.date = data.date;
+        this.convertValue.rate = data.rates[this.convertValue.fromType];
+        this.convertValue.converted = Math.round(this.convertValue.amount/data.rates[this.convertValue.fromType] * 100)/100;
+        this.$.toast.text="Currency Converted. Save this transaction";
+        this.$.toast.open();
+        this.convertValue = JSON.parse(JSON.stringify(this.convertValue));
+        //console.log(this.convertValue);
+      }
+      submitForm(){
+        if(this.$.forexConvert.validate()){
+          if( this.convertValue.toType == this.convertValue.fromType ){
+            this.$.toast.text="Select Different Currency Types to Compare";
+            this.$.toast.open();
+          }else{
+            var aj = this.$.convertNow;
+            this.convertValue.amount = parseInt(this.convertValue.amount);
+            aj.params = JSON.parse('{"base":"' + this.convertValue.toType + '", "symbols":"' + this.convertValue.fromType + '"}');
+            aj.generateRequest();
+            this.convertValue.status = true;
+          }
+        }
+      }
+      saveData(){
+        this.$.saveTransaction.body= this.convertValue;
+        var savedb = this.$.saveTransaction.generateRequest();
+        savedb.confirm.then
+      }
+      saveStatus(e){
+        console.log(e.detail.__data.response);
+      }
+    }
+    window.customElements.define(ForexConvert.is, ForexConvert);
+  </script>
+</dom-module>
